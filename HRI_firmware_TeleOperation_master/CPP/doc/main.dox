@@ -1,0 +1,24 @@
+/**
+ * @mainpage HRI C++ interface documentation
+ *
+ * @section intro_sec Introduction
+ * This C++ interface is designed to control a HRI board through the serial
+ * port. Unlike the MATLAB interface, it runs much faster, and allows complex
+ * programs to interact with the HRI board.
+ * It is using the Qt 5 library, which allows easy and clean code, while
+ * while enabling high-performance graphics.
+ *
+ * The given interface essentially allows to interact with the board using the
+ * synchronised variables system ("SyncVar"), for single read/write or
+ * continuous data streaming.
+ *
+ * Two programs are included :
+ * - HRI_PC_Controller is a ready-to-use application that allows to list, ready,
+ * write, plot and log the SyncVars of the board.
+ * - HriExampleProgram is a simple example that shows how to make a user
+ * interface that can interact with the HRI board.
+ *
+ * @section support_sec Maintenance and technical support
+ * Please report any bug or suggestion to Romain Baud (romain.baud@epfl.ch).
+ * Technical support is also available.
+ */

@@ -1,0 +1,12 @@
+CPP/*/*.pro.*
+CPP/build-*
+CPP/*/build-*
+CPP/doc/html/
+Firmware/carteHRI.uvguix.*
+Firmware/doc/html/
+Firmware/Debug/
+Firmware/Release/
+Firmware/*.cfg
+Firmware/STM32F407G-DISC1.xml
+Firmware/.settings/language.settings.xml
+MATLAB/logs/*
