@@ -34,6 +34,12 @@ volatile float32_t hapt_motorTorque; // Motor torque [N.m].
 
 volatile float32_t temp = 0.0f;
 
+
+volatile uint8_t slave_bits;	//to check bits received by the slave
+volatile uint32_t bytes_read = 0;
+volatile float32_t temp_float32 = 0.0f;
+volatile float32_t gui_variable = 30.0f;
+
 void hapt_Update(void);
 
 /**
@@ -56,7 +62,7 @@ void hapt_Init(void)
     comm_monitorFloat("hall_voltage [V]", (float32_t*)&hapt_hallVoltage, READONLY);
 
 
-    comm_monitorFloat("temp_var", (float32_t*)&temp, READONLY);
+    comm_monitorFloat("slave torque [N.m]", (float32_t*)&gui_variable, READONLY);
 }
 
 /**
@@ -65,6 +71,8 @@ void hapt_Init(void)
 void hapt_Update()
 {
 
+	static uint32_t temp_int32 = 0;
+	void *temp_point = NULL;
 	void *temp_pointer = &temp;
 	uint32_t temp_word = *(uint32_t *)temp_pointer;
 	static uint32_t second_div = 0;
@@ -84,10 +92,6 @@ void hapt_Update()
     motorShaftAngle = enc_GetPosition();
     hapt_encoderPaddleAngle = motorShaftAngle / REDUCTION_RATIO;
 
-    // Compute the motor torque, and apply it.
-    hapt_motorTorque = 0.0f;
-    torq_SetTorque(hapt_motorTorque);
-
 
     // sending bits to slave
     second_div++;
@@ -99,8 +103,49 @@ void hapt_Update()
     	exuart_SendByteAsync(*(byte_pointer)++); //sending
     	exuart_SendByteAsync(*(byte_pointer)++); //sending
     	exuart_SendByteAsync(*(byte_pointer)++); //sending
-
-    	//temp += 1.0;
     }
+
+    // reading torque values from slave
+    if(exuart_ReceivedBytesCount() >= 5){
+    	//should keep reading the bytes until you see header
+	   while(exuart_ReceivedBytesCount() >= 5){ //if any bits received
+			slave_bits = exuart_GetByte();
+			if(slave_bits == START_BYTE){ //check the header byte
+				break;
+			}
+	   }
+		if(exuart_ReceivedBytesCount() >= 4){ //if number of bytes received is >= 4 bytes, then keep receiving
+
+			slave_bits = exuart_GetByte();
+			temp_int32 = slave_bits;
+
+			slave_bits = exuart_GetByte();
+			temp_int32 |= slave_bits << 8;
+
+			slave_bits = exuart_GetByte();
+			temp_int32 |= slave_bits << 16;
+
+			slave_bits = exuart_GetByte();
+			temp_int32 |= slave_bits << 24;
+
+			temp_point = &temp_int32;
+			temp_float32 = *(float32_t *) temp_point;
+			bytes_read = temp_int32;
+
+			gui_variable = temp_float32;
+		}
+
+		hapt_motorTorque = -temp_float32;
+		// saturation block
+		if(hapt_motorTorque > 0.02){
+			hapt_motorTorque = 0.02;
+		}
+		else if(hapt_motorTorque < -0.02){
+			hapt_motorTorque = -0.02;
+		}
+
+
+		torq_SetTorque(hapt_motorTorque);
+	}
 }
 
