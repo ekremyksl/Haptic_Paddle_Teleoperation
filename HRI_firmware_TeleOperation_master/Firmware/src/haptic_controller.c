@@ -41,7 +41,7 @@ void hapt_Update(void);
   */
 void hapt_Init(void)
 {
-	exuart_Init(115200);
+	exuart_Init(256000);
     hapt_timestamp = 0;
     hapt_motorTorque = 0.0f;
 
@@ -91,15 +91,16 @@ void hapt_Update()
 
     // sending bits to slave
     second_div++;
-    if(1 || second_div % 4096 == 0){
+
+    if(second_div % 1 == 0){
     	uint8_t * byte_pointer = &hapt_encoderPaddleAngle;
     	exuart_SendByteAsync(START_BYTE);
     	exuart_SendByteAsync(*(byte_pointer)++); //sending
     	exuart_SendByteAsync(*(byte_pointer)++); //sending
     	exuart_SendByteAsync(*(byte_pointer)++); //sending
     	exuart_SendByteAsync(*(byte_pointer)++); //sending
+
     	//temp += 1.0;
     }
-
 }
 
