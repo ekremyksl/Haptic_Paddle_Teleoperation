@@ -28,7 +28,7 @@
 #define START_BYTE 0x4D   //starting byte for synchronization
 #define CUT_OFF 50
 
-#define QUEUE_SIZE 500*4 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
+#define QUEUE_SIZE 100*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
 
 volatile uint32_t  hapt_timestamp; // Time base of the controller, also used to timestamp the samples sent by streaming [us].
 volatile float32_t hapt_hallVoltage; // Hall sensor output voltage [V].
@@ -68,6 +68,14 @@ void hapt_Init(void)
     hapt_timestamp = 0;
     hapt_motorTorque = 0.0f;
 
+    //Initialize delay buffer
+    cb_Init(&circDelayBuffer, delayBuffer, QUEUE_SIZE);
+
+    //Fill buffer with zeros initially
+    for (uint16_t lv = 0; lv<QUEUE_SIZE-1; lv++){
+    	cb_Push(&circDelayBuffer, 0);
+    }
+
     // Make the timers call the update function periodically.
     cbt_SetHapticControllerTimer(hapt_Update, DEFAULT_HAPTIC_CONTROLLER_PERIOD);
 
@@ -86,14 +94,6 @@ void hapt_Init(void)
     comm_monitorFloat("Ki", (float32_t*)&Ki, READWRITE);
     comm_monitorFloat("Kd", (float32_t*)&Kd, READWRITE);
     //------------------------------------------
-
-    //Initialize delay buffer
-    cb_Init(&circDelayBuffer, delayBuffer, QUEUE_SIZE);
-
-    //Fill buffer with zeros intially
-    for (int lv = 0; lv<QUEUE_SIZE; lv++){
-    	cb_Push(&circDelayBuffer, 0);
-    }
 }
 
 /**
