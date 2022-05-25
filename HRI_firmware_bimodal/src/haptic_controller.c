@@ -28,6 +28,8 @@
 #define START_BYTE 0x4D   //starting byte for synchronization
 #define CUT_OFF 50
 
+#define QUEUE_SIZE 500*4 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
+
 volatile uint32_t  hapt_timestamp; // Time base of the controller, also used to timestamp the samples sent by streaming [us].
 volatile float32_t hapt_hallVoltage; // Hall sensor output voltage [V].
 volatile float32_t hapt_encoderPaddleAngle; // Paddle angle measured by the incremental encoder [deg].
@@ -52,6 +54,10 @@ float32_t lowPass(float32_t curr, float32_t prev, float32_t dt);
 float32_t PID(float32_t position_error, float32_t position_error_prev, float32_t dt);
 
 void hapt_Update(void);
+
+
+uint8_t delayBuffer[QUEUE_SIZE] = { 0 };
+cb_CircularBuffer circDelayBuffer;
 
 /**
   * @brief Initializes the haptic controller.
@@ -80,6 +86,14 @@ void hapt_Init(void)
     comm_monitorFloat("Ki", (float32_t*)&Ki, READWRITE);
     comm_monitorFloat("Kd", (float32_t*)&Kd, READWRITE);
     //------------------------------------------
+
+    //Initialize delay buffer
+    cb_Init(&circDelayBuffer, delayBuffer, QUEUE_SIZE);
+
+    //Fill buffer with zeros intially
+    for (int lv = 0; lv<QUEUE_SIZE; lv++){
+    	cb_Push(&circDelayBuffer, 0);
+    }
 }
 
 /**
@@ -139,16 +153,16 @@ void hapt_Update()
 	   }
 		if(exuart_ReceivedBytesCount() >= 4){
 			//if number of bytes received is >= 4 bytes, then keep receiving
-			slave_bits = exuart_GetByte();
+			slave_bits = cb_Pull(&circDelayBuffer);
 			temp_int32 = slave_bits;
 
-			slave_bits = exuart_GetByte();
+			slave_bits = cb_Pull(&circDelayBuffer);
 			temp_int32 |= slave_bits << 8;
 
-			slave_bits = exuart_GetByte();
+			slave_bits = cb_Pull(&circDelayBuffer);
 			temp_int32 |= slave_bits << 16;
 
-			slave_bits = exuart_GetByte();
+			slave_bits = cb_Pull(&circDelayBuffer);
 			temp_int32 |= slave_bits << 24;
 
 			temp_point = &temp_int32;
@@ -156,6 +170,12 @@ void hapt_Update()
 			bytes_read = temp_int32;
 
 			gui_variable = temp_float32;
+
+		    //Implement delay
+		    cb_Push(&circDelayBuffer, exuart_GetByte());
+		    cb_Push(&circDelayBuffer, exuart_GetByte());
+		    cb_Push(&circDelayBuffer, exuart_GetByte());
+		    cb_Push(&circDelayBuffer, exuart_GetByte());
 		}
 	}
 
