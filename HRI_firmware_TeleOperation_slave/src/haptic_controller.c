@@ -28,6 +28,8 @@
 #define START_BYTE 0x4D //header of bits sent
 #define CUT_OFF 20000.0
 
+#define DELAY true
+#define QUEUE_SIZE 100*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
 
 volatile uint32_t  hapt_timestamp; // Time base of the controller, also used to timestamp the samples sent by streaming [us].
 volatile float32_t hapt_hallVoltage; // Hall sensor output voltage [V].
@@ -56,6 +58,9 @@ float32_t PID(float32_t position_error, float32_t position_error_prev, float32_t
 
 void hapt_Update(void);
 
+uint8_t delayBuffer[QUEUE_SIZE] = { 0 };
+cb_CircularBuffer circDelayBuffer;
+
 /**
   * @brief Initializes the haptic controller.
   */
@@ -64,6 +69,14 @@ void hapt_Init(void)
 	exuart_Init(115200);
     hapt_timestamp = 0;
     hapt_motorTorque = 0.0f;
+
+    //Initialize delay buffer
+    cb_Init(&circDelayBuffer, delayBuffer, QUEUE_SIZE);
+
+    //Fill buffer with zeros initially
+    for (uint16_t lv = 0; lv<QUEUE_SIZE-1; lv++){
+    	cb_Push(&circDelayBuffer, 0);
+    }
 
     // Make the timers call the update function periodically.
     cbt_SetHapticControllerTimer(hapt_Update, DEFAULT_HAPTIC_CONTROLLER_PERIOD);
@@ -127,6 +140,44 @@ void hapt_Update()
     	slave_bits = exuart_GetByte(); //discard
     }*/
 
+#if DELAY
+    if(exuart_ReceivedBytesCount() >= 5){
+    	//should keep reading the bytes until you see header
+	   while(exuart_ReceivedBytesCount() >= 5){ //if any bits received
+			slave_bits = exuart_GetByte();
+			if(slave_bits == START_BYTE){ //check the header byte
+				break;
+			}
+	   }
+		if(exuart_ReceivedBytesCount() >= 4){ //if number of bytes received is >= 4 bytes, then keep receiving
+
+			slave_bits = cb_Pull(&circDelayBuffer);
+			temp_int32 = slave_bits;
+
+			slave_bits = cb_Pull(&circDelayBuffer);
+			temp_int32 |= slave_bits << 8;
+
+			slave_bits = cb_Pull(&circDelayBuffer);
+			temp_int32 |= slave_bits << 16;
+
+			slave_bits = cb_Pull(&circDelayBuffer);
+			temp_int32 |= slave_bits << 24;
+
+			temp_point = &temp_int32;
+			temp_float32 = *(float32_t *) temp_point;
+			bytes_read = temp_int32;
+			if(temp_float32 < 45 && temp_float32 > -45){
+				gui_variable = temp_float32;
+			}
+
+		    //Implement delay
+		    cb_Push(&circDelayBuffer, exuart_GetByte());
+		    cb_Push(&circDelayBuffer, exuart_GetByte());
+		    cb_Push(&circDelayBuffer, exuart_GetByte());
+		    cb_Push(&circDelayBuffer, exuart_GetByte());
+		}
+	}
+#else
     if(exuart_ReceivedBytesCount() >= 5){
     	//should keep reading the bytes until you see header
 	   while(exuart_ReceivedBytesCount() >= 5){ //if any bits received
@@ -152,11 +203,12 @@ void hapt_Update()
 			temp_point = &temp_int32;
 			temp_float32 = *(float32_t *) temp_point;
 			bytes_read = temp_int32;
-			if(1 || temp_float32 < 45 && temp_float32 > -45){
+			if(temp_float32 < 45 && temp_float32 > -45){
 				gui_variable = temp_float32;
 			}
 		}
 	}
+#endif
 
     position = lowPass(gui_variable, position_prev, dt);
     //speed = (position - position_prev) / dt;
