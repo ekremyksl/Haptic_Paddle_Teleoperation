@@ -23,6 +23,7 @@
 #include "lib/utils.h"
 #include "torque_regulator.h"
 #include "drivers/ext_uart.h"
+#include "drivers/debug_gpio.h"
 
 #define DEFAULT_HAPTIC_CONTROLLER_PERIOD 350 // Default control loop period [us].
 #define START_BYTE 0x4D   //starting byte for synchronization
@@ -37,6 +38,7 @@ volatile float32_t hapt_motorTorque; // Motor torque [N.m].
 
 volatile float32_t temp = 0.0f;
 volatile bool pid_enable = false;
+volatile bool digital_IO = false;
 
 volatile uint8_t slave_bits;	//to check bits received by the slave
 volatile uint32_t bytes_read = 0;
@@ -86,6 +88,7 @@ void hapt_Init(void)
     comm_monitorFloat("encoder_paddle_pos [deg]", (float32_t*)&hapt_encoderPaddleAngle, READONLY);
     comm_monitorFloat("hall_voltage [V]", (float32_t*)&hapt_hallVoltage, READONLY);
     comm_monitorBool("enable PID", (bool*) &pid_enable, READWRITE);
+    comm_monitorBool("enable DIO", (bool*) &digital_IO, READWRITE);
 
 
     comm_monitorFloat("Neighbour position [deg]", (float32_t*)&gui_variable, READONLY);
@@ -112,7 +115,8 @@ void hapt_Update()
 	static float32_t hapt_encoderPaddleAngle_prev = 0.0f;
 	float32_t temp_float32 = 0.0f;
 
-
+	//Set/reset GPIO
+	dio_Set(0, digital_IO);
 
     float32_t motorShaftAngle; // [deg].
 

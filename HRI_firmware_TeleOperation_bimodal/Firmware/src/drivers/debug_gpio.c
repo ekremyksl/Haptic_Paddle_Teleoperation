@@ -16,10 +16,10 @@
 
 #include "debug_gpio.h"
 
-#define N_GPIOS 3
-#define DIO_PORT GPIOB
+#define N_GPIOS 2
+#define DIO_PORT GPIOD
 
-const uint32_t dio_gpios[N_GPIOS] = { GPIO_Pin_14, GPIO_Pin_13, GPIO_Pin_12 };
+const uint32_t dio_gpios[N_GPIOS] = { GPIO_Pin_0, GPIO_Pin_1};
 
 void dio_Init(void)
 {
