@@ -31,6 +31,9 @@
 #define DELAY true
 #define QUEUE_SIZE 100*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
 
+#define VIRTUAL_WALL true
+#define WALL_ANGLE 30.0 //PLace walls at +/- 30degrees
+
 volatile uint32_t  hapt_timestamp; // Time base of the controller, also used to timestamp the samples sent by streaming [us].
 volatile float32_t hapt_hallVoltage; // Hall sensor output voltage [V].
 volatile float32_t hapt_encoderPaddleAngle; // Paddle angle measured by the incremental encoder [deg].
@@ -217,10 +220,26 @@ void hapt_Update()
 
     hapt_encoderPaddleAngle = lowPass(hapt_encoderPaddleAngle, hapt_encoderPaddleAngle_prev, dt);
     if(pid_enable){
+#if VIRTUAL_WALL
+		static float32_t error_prev = 0.0f;
+		float32_t error = 0.0f;
+    	if (hapt_encoderPaddleAngle > WALL_ANGLE){
+    		error = WALL_ANGLE - hapt_encoderPaddleAngle;
+    	}
+    	else if (hapt_encoderPaddleAngle < -WALL_ANGLE){
+    		error = -WALL_ANGLE - hapt_encoderPaddleAngle;
+    	}
+    	else{
+			error = position - hapt_encoderPaddleAngle;
+    	}
+		hapt_motorTorque = PID(error, error_prev, dt);
+		error_prev = error;
+#else
     	float32_t error = position - hapt_encoderPaddleAngle;
     	static float32_t error_prev = 0.0f;
     	hapt_motorTorque = PID(error, error_prev, dt);
 		error_prev = error;
+#endif
     }
     else{
     	hapt_motorTorque = 0.0f;
