@@ -29,7 +29,7 @@
 #define CUT_OFF 50.0
 
 #define DELAY false
-#define QUEUE_SIZE 100*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
+#define QUEUE_SIZE 1000*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
 
 #define VIRTUAL_WALL true
 #define WALL_ANGLE 15.0 //PLace walls at +/- 30degrees
@@ -54,6 +54,8 @@ volatile float32_t speed = 0.0;
 
 volatile bool pid_enable = false;	// regulator flag to be turned on/off from GUI
 volatile bool digital_IO = false;
+
+volatile uint16_t delay_samples = 1;
 
 volatile float32_t gui_variable = 45.0f;
 
@@ -120,6 +122,34 @@ void hapt_Update()
 
 	digital_IO = dio_Get(1);
 
+	if (cb_ItemsCount(&circDelayBuffer) > 4*delay_samples)
+	{
+	    //Discharge buffer
+	    while (cb_ItemsCount(&circDelayBuffer) > 4*delay_samples)
+	    {
+	    	cb_Pull(&circDelayBuffer);
+	    	cb_Pull(&circDelayBuffer);
+	    	cb_Pull(&circDelayBuffer);
+	    	cb_Pull(&circDelayBuffer);
+	    }
+	}
+	else if (cb_ItemsCount(&circDelayBuffer) < 4*delay_samples)
+	{
+		//Charge buffer
+		uint8_t bytes[4];
+		bytes[0] = cb_Pull(&circDelayBuffer);
+		bytes[1] = cb_Pull(&circDelayBuffer);
+		bytes[2] = cb_Pull(&circDelayBuffer);
+		bytes[3] = cb_Pull(&circDelayBuffer);
+	    while (cb_ItemsCount(&circDelayBuffer) < 4*delay_samples)
+	    {
+	    	cb_Push(&circDelayBuffer, bytes[0]);
+	    	cb_Push(&circDelayBuffer, bytes[1]);
+	    	cb_Push(&circDelayBuffer, bytes[2]);
+	    	cb_Push(&circDelayBuffer, bytes[3]);
+	    }
+	}
+
     float32_t motorShaftAngle; // [deg].
 
     // Compute the dt (uncomment if you need it).
@@ -134,17 +164,6 @@ void hapt_Update()
     // Get the encoder position.
     motorShaftAngle = enc_GetPosition();
     hapt_encoderPaddleAngle = motorShaftAngle / REDUCTION_RATIO;
-
-
-
-   /* for(int i= 0; i < 1000; i++){
-  	   if(exuart_ReceivedBytesCount() >= 4) break;
-     }*/
-
-
-    /*while(exuart_ReceivedBytesCount() > 9){
-    	slave_bits = exuart_GetByte(); //discard
-    }*/
 
 #if DELAY
 
