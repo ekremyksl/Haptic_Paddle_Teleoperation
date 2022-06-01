@@ -67,7 +67,7 @@ cb_CircularBuffer circDelayBuffer;
   */
 void hapt_Init(void)
 {
-	exuart_Init(256000);
+	exuart_Init(576000);
     hapt_timestamp = 0;
     hapt_motorTorque = 0.0f;
 
