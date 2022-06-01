@@ -125,7 +125,7 @@ void hapt_Update()
 	//Set/reset GPIO
 	dio_Set(0, digital_IO);
 #else
-	digital_IO = dio_Get(0);
+	digital_IO = dio_Get(1);
 #endif
 
     float32_t motorShaftAngle; // [deg].
