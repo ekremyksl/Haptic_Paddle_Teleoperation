@@ -31,8 +31,8 @@
 #define DELAY false
 #define QUEUE_SIZE 100*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
 
-#define VIRTUAL_WALL false
-#define WALL_ANGLE 30.0 //PLace walls at +/- 30degrees
+#define VIRTUAL_WALL true
+#define WALL_ANGLE 15.0 //PLace walls at +/- 30degrees
 
 volatile uint32_t  hapt_timestamp; // Time base of the controller, also used to timestamp the samples sent by streaming [us].
 volatile float32_t hapt_hallVoltage; // Hall sensor output voltage [V].
@@ -231,10 +231,10 @@ void hapt_Update()
 #if VIRTUAL_WALL
 		static float32_t error_prev = 0.0f;
 		float32_t error = 0.0f;
-    	if (hapt_encoderPaddleAngle > WALL_ANGLE){
+    	if (position > WALL_ANGLE){
     		error = WALL_ANGLE - hapt_encoderPaddleAngle;
     	}
-    	else if (hapt_encoderPaddleAngle < -WALL_ANGLE){
+    	else if (position < -WALL_ANGLE){
     		error = -WALL_ANGLE - hapt_encoderPaddleAngle;
     	}
     	else{

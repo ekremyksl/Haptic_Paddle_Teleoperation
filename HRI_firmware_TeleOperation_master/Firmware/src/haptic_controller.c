@@ -72,7 +72,6 @@ void hapt_Init(void)
   */
 void hapt_Update()
 {
-
 	static uint32_t temp_int32 = 0;
 	void *temp_point = NULL;
 	void *temp_pointer = &temp;

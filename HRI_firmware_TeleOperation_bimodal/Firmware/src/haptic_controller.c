@@ -25,6 +25,7 @@
 #include "drivers/ext_uart.h"
 #include "drivers/debug_gpio.h"
 
+#define SYNC_SENDER false
 #define DEFAULT_HAPTIC_CONTROLLER_PERIOD 350 // Default control loop period [us].
 #define START_BYTE 0x4D   //starting byte for synchronization
 #define CUT_OFF 50
@@ -88,7 +89,12 @@ void hapt_Init(void)
     comm_monitorFloat("encoder_paddle_pos [deg]", (float32_t*)&hapt_encoderPaddleAngle, READONLY);
     comm_monitorFloat("hall_voltage [V]", (float32_t*)&hapt_hallVoltage, READONLY);
     comm_monitorBool("enable PID", (bool*) &pid_enable, READWRITE);
+
+#if SYNC_SENDER
     comm_monitorBool("enable DIO", (bool*) &digital_IO, READWRITE);
+#else
+    comm_monitorBool("enable DIO", (bool*) &digital_IO, READONLY);
+#endif
 
 
     comm_monitorFloat("Neighbour position [deg]", (float32_t*)&gui_variable, READONLY);
@@ -115,8 +121,12 @@ void hapt_Update()
 	static float32_t hapt_encoderPaddleAngle_prev = 0.0f;
 	float32_t temp_float32 = 0.0f;
 
+#if SYNC_SENDER
 	//Set/reset GPIO
 	dio_Set(0, digital_IO);
+#else
+	digital_IO = dio_Get(0);
+#endif
 
     float32_t motorShaftAngle; // [deg].
 
@@ -146,41 +156,43 @@ void hapt_Update()
     	exuart_SendByteAsync(*(byte_pointer)++); //sending
     }
 
+    //discard bytes until we have 9 bytes
+    while(exuart_ReceivedBytesCount() >= 9){
+    	exuart_GetByte();
+    }
     // reading position values from neighbour
     if(exuart_ReceivedBytesCount() >= 5){
     	//should keep reading the bytes until you see header
 	   while(exuart_ReceivedBytesCount() >= 5){ //if any bits received
 			slave_bits = exuart_GetByte();
 			if(slave_bits == START_BYTE){ //check the header byte
+				//if number of bytes received is >= 4 bytes, then keep receiving
+				slave_bits = cb_Pull(&circDelayBuffer);
+				temp_int32 = slave_bits;
+
+				slave_bits = cb_Pull(&circDelayBuffer);
+				temp_int32 |= slave_bits << 8;
+
+				slave_bits = cb_Pull(&circDelayBuffer);
+				temp_int32 |= slave_bits << 16;
+
+				slave_bits = cb_Pull(&circDelayBuffer);
+				temp_int32 |= slave_bits << 24;
+
+				temp_point = &temp_int32;
+				temp_float32 = *(float32_t *) temp_point;
+				bytes_read = temp_int32;
+
+				gui_variable = temp_float32;
+
+			    //Implement delay
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
 				break;
 			}
 	   }
-		if(exuart_ReceivedBytesCount() >= 4){
-			//if number of bytes received is >= 4 bytes, then keep receiving
-			slave_bits = cb_Pull(&circDelayBuffer);
-			temp_int32 = slave_bits;
-
-			slave_bits = cb_Pull(&circDelayBuffer);
-			temp_int32 |= slave_bits << 8;
-
-			slave_bits = cb_Pull(&circDelayBuffer);
-			temp_int32 |= slave_bits << 16;
-
-			slave_bits = cb_Pull(&circDelayBuffer);
-			temp_int32 |= slave_bits << 24;
-
-			temp_point = &temp_int32;
-			temp_float32 = *(float32_t *) temp_point;
-			bytes_read = temp_int32;
-
-			gui_variable = temp_float32;
-
-		    //Implement delay
-		    cb_Push(&circDelayBuffer, exuart_GetByte());
-		    cb_Push(&circDelayBuffer, exuart_GetByte());
-		    cb_Push(&circDelayBuffer, exuart_GetByte());
-		    cb_Push(&circDelayBuffer, exuart_GetByte());
-		}
 	}
 
 	// filtering the positions of each neighbour
