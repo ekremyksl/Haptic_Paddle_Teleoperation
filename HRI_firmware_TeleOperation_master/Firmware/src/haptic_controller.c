@@ -38,7 +38,8 @@ volatile float32_t temp = 0.0f;
 volatile uint8_t slave_bits;	//to check bits received by the slave
 volatile uint32_t bytes_read = 0;
 volatile float32_t temp_float32 = 0.0f;
-volatile float32_t gui_variable = 30.0f;
+volatile float32_t gui_variable = 0.0f;
+volatile bool enable_master = false;
 
 void hapt_Update(void);
 
@@ -63,6 +64,7 @@ void hapt_Init(void)
 
 
     comm_monitorFloat("slave torque [N.m]", (float32_t*)&gui_variable, READONLY);
+    comm_monitorBool("enable master torque", (bool*)&enable_master, READWRITE);
 }
 
 /**
@@ -135,15 +137,19 @@ void hapt_Update()
 			gui_variable = temp_float32;
 		}
 
-		hapt_motorTorque = -temp_float32;
-		// saturation block
-		if(hapt_motorTorque > 0.02){
-			hapt_motorTorque = 0.02;
+		if(enable_master){
+			hapt_motorTorque = -temp_float32;
+			// saturation block
+			if(hapt_motorTorque > MOTOR_NOMINAL_TORQUE){
+				hapt_motorTorque = MOTOR_NOMINAL_TORQUE;
+			}
+			else if(hapt_motorTorque < -MOTOR_NOMINAL_TORQUE){
+				hapt_motorTorque = -MOTOR_NOMINAL_TORQUE;
+			}
 		}
-		else if(hapt_motorTorque < -0.02){
-			hapt_motorTorque = -0.02;
+		else{
+			hapt_motorTorque = 0;
 		}
-
 
 		torq_SetTorque(hapt_motorTorque);
 	}

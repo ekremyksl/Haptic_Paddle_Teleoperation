@@ -26,12 +26,12 @@
 
 #define DEFAULT_HAPTIC_CONTROLLER_PERIOD 350 // Default control loop period [us].
 #define START_BYTE 0x4D //header of bits sent
-#define CUT_OFF 20000.0
+#define CUT_OFF 50.0
 
-#define DELAY true
+#define DELAY false
 #define QUEUE_SIZE 100*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
 
-#define VIRTUAL_WALL true
+#define VIRTUAL_WALL false
 #define WALL_ANGLE 30.0 //PLace walls at +/- 30degrees
 
 volatile uint32_t  hapt_timestamp; // Time base of the controller, also used to timestamp the samples sent by streaming [us].
@@ -45,8 +45,8 @@ volatile float32_t temp_float32 = 0.0f;
 
 //PID gains
 volatile float32_t Kp = 0.001;
-volatile float32_t Ki = 0.005;
-volatile float32_t Kd = 0.0005;
+volatile float32_t Ki = 0.000;
+volatile float32_t Kd = 0.0001;
 
 //
 volatile float32_t position = 0.0f;
@@ -69,7 +69,7 @@ cb_CircularBuffer circDelayBuffer;
   */
 void hapt_Init(void)
 {
-	exuart_Init(115200);
+	exuart_Init(256000);
     hapt_timestamp = 0;
     hapt_motorTorque = 0.0f;
 
@@ -251,6 +251,13 @@ void hapt_Update()
     hapt_encoderPaddleAngle_prev = hapt_encoderPaddleAngle;
     //speed_prev = speed;
     position_prev = position;
+
+	uint8_t * byte_pointer = &hapt_motorTorque;
+	exuart_SendByteAsync(START_BYTE);
+	exuart_SendByteAsync(*(byte_pointer)++); //sending
+	exuart_SendByteAsync(*(byte_pointer)++); //sending
+	exuart_SendByteAsync(*(byte_pointer)++); //sending
+	exuart_SendByteAsync(*(byte_pointer)++); //sending
 
 }
 
