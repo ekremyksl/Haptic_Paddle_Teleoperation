@@ -25,12 +25,12 @@
 #include "drivers/ext_uart.h"
 #include "drivers/debug_gpio.h"
 
-#define SYNC_SENDER false
+#define SYNC_SENDER true
 #define DEFAULT_HAPTIC_CONTROLLER_PERIOD 350 // Default control loop period [us].
 #define START_BYTE 0x4D   //starting byte for synchronization
 #define CUT_OFF 50
 
-#define QUEUE_SIZE 100*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
+#define QUEUE_SIZE 1000*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
 
 volatile uint32_t  hapt_timestamp; // Time base of the controller, also used to timestamp the samples sent by streaming [us].
 volatile float32_t hapt_hallVoltage; // Hall sensor output voltage [V].
@@ -46,6 +46,7 @@ volatile uint32_t bytes_read = 0;
 volatile float32_t temp_float32 = 0.0f;
 volatile float32_t gui_variable = 0.0f;
 
+volatile uint16_t delay_samples = 100;
 
 //PID gains
 volatile float32_t Kp = 0.001;
@@ -75,7 +76,7 @@ void hapt_Init(void)
     cb_Init(&circDelayBuffer, delayBuffer, QUEUE_SIZE);
 
     //Fill buffer with zeros initially
-    for (uint16_t lv = 0; lv<QUEUE_SIZE-1; lv++){
+    for (uint16_t lv = 0; lv<4*delay_samples; lv++){
     	cb_Push(&circDelayBuffer, 0);
     }
 
@@ -89,6 +90,7 @@ void hapt_Init(void)
     comm_monitorFloat("encoder_paddle_pos [deg]", (float32_t*)&hapt_encoderPaddleAngle, READONLY);
     comm_monitorFloat("hall_voltage [V]", (float32_t*)&hapt_hallVoltage, READONLY);
     comm_monitorBool("enable PID", (bool*) &pid_enable, READWRITE);
+    comm_monitorUint16("delay [samples]", (uint32_t*) &delay_samples, READWRITE);
 
 #if SYNC_SENDER
     comm_monitorBool("enable DIO", (bool*) &digital_IO, READWRITE);
@@ -127,6 +129,34 @@ void hapt_Update()
 #else
 	digital_IO = dio_Get(1);
 #endif
+
+	if (cb_ItemsCount(&circDelayBuffer) > 4*delay_samples)
+	{
+	    //Discharge buffer
+	    while (cb_ItemsCount(&circDelayBuffer) > 4*delay_samples)
+	    {
+	    	cb_Pull(&circDelayBuffer);
+	    	cb_Pull(&circDelayBuffer);
+	    	cb_Pull(&circDelayBuffer);
+	    	cb_Pull(&circDelayBuffer);
+	    }
+	}
+	else if (cb_ItemsCount(&circDelayBuffer) < 4*delay_samples)
+	{
+		//Charge buffer
+		uint8_t bytes[4];
+		bytes[0] = cb_Pull(&circDelayBuffer);
+		bytes[1] = cb_Pull(&circDelayBuffer);
+		bytes[2] = cb_Pull(&circDelayBuffer);
+		bytes[3] = cb_Pull(&circDelayBuffer);
+	    while (cb_ItemsCount(&circDelayBuffer) < 4*delay_samples)
+	    {
+	    	cb_Push(&circDelayBuffer, bytes[0]);
+	    	cb_Push(&circDelayBuffer, bytes[1]);
+	    	cb_Push(&circDelayBuffer, bytes[2]);
+	    	cb_Push(&circDelayBuffer, bytes[3]);
+	    }
+	}
 
     float32_t motorShaftAngle; // [deg].
 
