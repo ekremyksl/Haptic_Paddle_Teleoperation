@@ -26,11 +26,12 @@
 #include "drivers/debug_gpio.h"
 
 #define SYNC_SENDER true
+
 #define DEFAULT_HAPTIC_CONTROLLER_PERIOD 350 // Default control loop period [us].
 #define START_BYTE 0x4D   //starting byte for synchronization
 #define CUT_OFF 50
 
-#define VIRTUAL_WALL true
+#define VIRTUAL_WALL false
 #define WALL_ANGLE 15.0
 
 #define QUEUE_SIZE 1000*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
@@ -49,7 +50,7 @@ volatile uint32_t bytes_read = 0;
 volatile float32_t temp_float32 = 0.0f;
 volatile float32_t gui_variable = 0.0f;
 
-volatile uint16_t delay_samples = 1;
+volatile uint16_t delay_samples = 0;
 
 //PID gains
 volatile float32_t Kp = 0.001;
@@ -200,6 +201,12 @@ void hapt_Update()
 			slave_bits = exuart_GetByte();
 			if(slave_bits == START_BYTE){ //check the header byte
 				//if number of bytes received is >= 4 bytes, then keep receiving
+			    //Implement delay
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+
 				slave_bits = cb_Pull(&circDelayBuffer);
 				temp_int32 = slave_bits;
 
@@ -217,12 +224,6 @@ void hapt_Update()
 				bytes_read = temp_int32;
 
 				gui_variable = temp_float32;
-
-			    //Implement delay
-			    cb_Push(&circDelayBuffer, exuart_GetByte());
-			    cb_Push(&circDelayBuffer, exuart_GetByte());
-			    cb_Push(&circDelayBuffer, exuart_GetByte());
-			    cb_Push(&circDelayBuffer, exuart_GetByte());
 				break;
 			}
 	   }
