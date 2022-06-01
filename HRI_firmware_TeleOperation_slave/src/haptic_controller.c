@@ -53,6 +53,7 @@ volatile float32_t position = 0.0f;
 volatile float32_t speed = 0.0;
 
 volatile bool pid_enable = false;	// regulator flag to be turned on/off from GUI
+volatile bool digital_IO = false;
 
 volatile float32_t gui_variable = 45.0f;
 
@@ -101,6 +102,7 @@ void hapt_Init(void)
     comm_monitorFloat("Kd", (float32_t*)&Kd, READWRITE);
     //------------------------------------------
     comm_monitorBool("enable PID", (bool*)&pid_enable, READWRITE);
+    comm_monitorBool("enable DIO", (bool*) &digital_IO, READONLY);
 }
 
 /**
@@ -116,6 +118,7 @@ void hapt_Update()
 
 	void *temp_point = NULL;
 
+	digital_IO = dio_Get(1);
 
     float32_t motorShaftAngle; // [deg].
 

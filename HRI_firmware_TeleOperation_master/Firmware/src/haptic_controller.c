@@ -40,6 +40,7 @@ volatile uint32_t bytes_read = 0;
 volatile float32_t temp_float32 = 0.0f;
 volatile float32_t gui_variable = 0.0f;
 volatile bool enable_master = false;
+volatile bool digital_IO = false;
 
 void hapt_Update(void);
 
@@ -65,6 +66,7 @@ void hapt_Init(void)
 
     comm_monitorFloat("slave torque [N.m]", (float32_t*)&gui_variable, READONLY);
     comm_monitorBool("enable master torque", (bool*)&enable_master, READWRITE);
+    comm_monitorBool("enable DIO", (bool*) &digital_IO, READWRITE);
 }
 
 /**
@@ -77,6 +79,9 @@ void hapt_Update()
 	void *temp_pointer = &temp;
 	uint32_t temp_word = *(uint32_t *)temp_pointer;
 	static uint32_t second_div = 0;
+
+	//Set/reset GPIO
+	dio_Set(0, digital_IO);
 
     float32_t motorShaftAngle; // [deg].
 

@@ -16,26 +16,29 @@
 
 #include "debug_gpio.h"
 
-#define N_GPIOS 3
-#define DIO_PORT GPIOB
+#define N_GPIOS 2
+#define DIO_PORT GPIOD
 
-const uint32_t dio_gpios[N_GPIOS] = { GPIO_Pin_14, GPIO_Pin_13, GPIO_Pin_12 };
+const uint32_t dio_gpios[N_GPIOS] = { GPIO_Pin_0, GPIO_Pin_1};
 
 void dio_Init(void)
 {
     int i;
     GPIO_InitTypeDef GPIO_InitStruct;  
 
-    for(i=0; i<N_GPIOS; i++)
-    {
-        GPIO_InitStruct.GPIO_Pin   = dio_gpios[i];
-        GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_OUT;
-        GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
-        GPIO_InitStruct.GPIO_PuPd  = GPIO_PuPd_NOPULL;
-        GPIO_Init(DIO_PORT, &GPIO_InitStruct);
-        
-        GPIO_WriteBit(DIO_PORT, dio_gpios[i], Bit_RESET);
-    }
+	GPIO_InitStruct.GPIO_Pin   = dio_gpios[0];
+	GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_OUT;
+	GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStruct.GPIO_PuPd  = GPIO_PuPd_NOPULL;
+	GPIO_Init(DIO_PORT, &GPIO_InitStruct);
+
+	GPIO_InitStruct.GPIO_Pin   = dio_gpios[1];
+	GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_IN;
+	GPIO_InitStruct.GPIO_PuPd  = GPIO_PuPd_DOWN;
+	GPIO_Init(DIO_PORT, &GPIO_InitStruct);
+
+	GPIO_WriteBit(DIO_PORT, dio_gpios[i], Bit_RESET);
+	GPIO_WriteBit(DIO_PORT, dio_gpios[i], Bit_RESET);
 }
 
 bool dio_Get(int pinIndex)
