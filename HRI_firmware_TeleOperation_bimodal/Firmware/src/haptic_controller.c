@@ -30,6 +30,9 @@
 #define START_BYTE 0x4D   //starting byte for synchronization
 #define CUT_OFF 50
 
+#define VIRTUAL_WALL true
+#define WALL_ANGLE 15.0
+
 #define QUEUE_SIZE 1000*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
 
 volatile uint32_t  hapt_timestamp; // Time base of the controller, also used to timestamp the samples sent by streaming [us].
@@ -46,7 +49,7 @@ volatile uint32_t bytes_read = 0;
 volatile float32_t temp_float32 = 0.0f;
 volatile float32_t gui_variable = 0.0f;
 
-volatile uint16_t delay_samples = 100;
+volatile uint16_t delay_samples = 1;
 
 //PID gains
 volatile float32_t Kp = 0.001;
@@ -178,7 +181,7 @@ void hapt_Update()
     second_div++;
 
     if(second_div % 1 == 0){
-    	uint8_t * byte_pointer = &hapt_encoderPaddleAngle;
+    	uint8_t* byte_pointer = &hapt_encoderPaddleAngle;
     	exuart_SendByteAsync(START_BYTE);
     	exuart_SendByteAsync(*(byte_pointer)++); //sending
     	exuart_SendByteAsync(*(byte_pointer)++); //sending
@@ -229,14 +232,32 @@ void hapt_Update()
 	//temp_float32 = lowPass(temp_float32, temp_float32_prev, dt);
 	hapt_encoderPaddleAngle = lowPass(hapt_encoderPaddleAngle, hapt_encoderPaddleAngle_prev, dt);
 
-	// pos error of current device and its neighbour
-	float32_t position_error = temp_float32 - hapt_encoderPaddleAngle;
+	float32_t position_error = 0.0;
 
 	// PID between neighbours
     if(pid_enable){
-    	hapt_motorTorque = PID(position_error, position_error_prev, dt);
+#if VIRTUAL_WALL
+    	if (temp_float32 > WALL_ANGLE)
+    	{
+    		position_error = WALL_ANGLE - hapt_encoderPaddleAngle;
+    	}
+    	else if (temp_float32 < -WALL_ANGLE)
+    	{
+    		position_error = -WALL_ANGLE - hapt_encoderPaddleAngle;
+    	}
+    	else
+    	{
+    		// pos error of current device and its neighbour
+    		position_error = temp_float32 - hapt_encoderPaddleAngle;
+    	}
+#else
+		// pos error of current device and its neighbour
+		position_error = temp_float32 - hapt_encoderPaddleAngle;
+#endif
+		hapt_motorTorque = PID(position_error, position_error_prev, dt);
     }
-    else{
+    else
+    {
     	hapt_motorTorque = 0.0f;
     }
 
