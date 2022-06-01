@@ -69,7 +69,7 @@ cb_CircularBuffer circDelayBuffer;
   */
 void hapt_Init(void)
 {
-	exuart_Init(256000);
+	exuart_Init(576000);
     hapt_timestamp = 0;
     hapt_motorTorque = 0.0f;
 
@@ -144,72 +144,80 @@ void hapt_Update()
     }*/
 
 #if DELAY
+
+    // discard bytes until we have 9 bytes
+    while(exuart_ReceivedBytesCount() >= 9){
+    	exuart_GetByte();
+    }
+
     if(exuart_ReceivedBytesCount() >= 5){
     	//should keep reading the bytes until you see header
 	   while(exuart_ReceivedBytesCount() >= 5){ //if any bits received
 			slave_bits = exuart_GetByte();
 			if(slave_bits == START_BYTE){ //check the header byte
+				slave_bits = cb_Pull(&circDelayBuffer);
+				temp_int32 = slave_bits;
+
+				slave_bits = cb_Pull(&circDelayBuffer);
+				temp_int32 |= slave_bits << 8;
+
+				slave_bits = cb_Pull(&circDelayBuffer);
+				temp_int32 |= slave_bits << 16;
+
+				slave_bits = cb_Pull(&circDelayBuffer);
+				temp_int32 |= slave_bits << 24;
+
+				temp_point = &temp_int32;
+				temp_float32 = *(float32_t *) temp_point;
+				bytes_read = temp_int32;
+				if(temp_float32 < 45 && temp_float32 > -45){
+					gui_variable = temp_float32;
+				}
+
+			    //Implement delay
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
 				break;
 			}
 	   }
-		if(exuart_ReceivedBytesCount() >= 4){ //if number of bytes received is >= 4 bytes, then keep receiving
-
-			slave_bits = cb_Pull(&circDelayBuffer);
-			temp_int32 = slave_bits;
-
-			slave_bits = cb_Pull(&circDelayBuffer);
-			temp_int32 |= slave_bits << 8;
-
-			slave_bits = cb_Pull(&circDelayBuffer);
-			temp_int32 |= slave_bits << 16;
-
-			slave_bits = cb_Pull(&circDelayBuffer);
-			temp_int32 |= slave_bits << 24;
-
-			temp_point = &temp_int32;
-			temp_float32 = *(float32_t *) temp_point;
-			bytes_read = temp_int32;
-			if(temp_float32 < 45 && temp_float32 > -45){
-				gui_variable = temp_float32;
-			}
-
-		    //Implement delay
-		    cb_Push(&circDelayBuffer, exuart_GetByte());
-		    cb_Push(&circDelayBuffer, exuart_GetByte());
-		    cb_Push(&circDelayBuffer, exuart_GetByte());
-		    cb_Push(&circDelayBuffer, exuart_GetByte());
-		}
 	}
 #else
+    // discard bytes until we have 9 bytes
+    while(exuart_ReceivedBytesCount() >= 9){
+    	exuart_GetByte();
+    }
+
+    // reading torque values from slave
     if(exuart_ReceivedBytesCount() >= 5){
     	//should keep reading the bytes until you see header
 	   while(exuart_ReceivedBytesCount() >= 5){ //if any bits received
 			slave_bits = exuart_GetByte();
 			if(slave_bits == START_BYTE){ //check the header byte
+				slave_bits = exuart_GetByte();
+				temp_int32 = slave_bits;
+
+				slave_bits = exuart_GetByte();
+				temp_int32 |= slave_bits << 8;
+
+				slave_bits = exuart_GetByte();
+				temp_int32 |= slave_bits << 16;
+
+				slave_bits = exuart_GetByte();
+				temp_int32 |= slave_bits << 24;
+
+				temp_point = &temp_int32;
+				temp_float32 = *(float32_t *) temp_point;
+				bytes_read = temp_int32;
+				if(temp_float32 < 45 && temp_float32 > -45){
+					gui_variable = temp_float32;
+				}
+
+				gui_variable = temp_float32;
 				break;
 			}
 	   }
-		if(exuart_ReceivedBytesCount() >= 4){ //if number of bytes received is >= 4 bytes, then keep receiving
-
-			slave_bits = exuart_GetByte();
-			temp_int32 = slave_bits;
-
-			slave_bits = exuart_GetByte();
-			temp_int32 |= slave_bits << 8;
-
-			slave_bits = exuart_GetByte();
-			temp_int32 |= slave_bits << 16;
-
-			slave_bits = exuart_GetByte();
-			temp_int32 |= slave_bits << 24;
-
-			temp_point = &temp_int32;
-			temp_float32 = *(float32_t *) temp_point;
-			bytes_read = temp_int32;
-			if(temp_float32 < 45 && temp_float32 > -45){
-				gui_variable = temp_float32;
-			}
-		}
 	}
 #endif
 
