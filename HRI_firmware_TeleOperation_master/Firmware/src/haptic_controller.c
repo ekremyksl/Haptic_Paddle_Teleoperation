@@ -27,6 +27,9 @@
 #define DEFAULT_HAPTIC_CONTROLLER_PERIOD 350 // Default control loop period [us].
 #define START_BYTE 0x4D   //starting byte for synchronization
 
+#define DELAY true
+#define QUEUE_SIZE 1000*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
+
 volatile uint32_t  hapt_timestamp; // Time base of the controller, also used to timestamp the samples sent by streaming [us].
 volatile float32_t hapt_hallVoltage; // Hall sensor output voltage [V].
 volatile float32_t hapt_encoderPaddleAngle; // Paddle angle measured by the incremental encoder [deg].
@@ -42,6 +45,11 @@ volatile float32_t gui_variable = 0.0f;
 volatile bool enable_master = false;
 volatile bool digital_IO = false;
 
+volatile uint16_t delay_samples = 0;
+
+uint8_t delayBuffer[QUEUE_SIZE] = { 0 };
+cb_CircularBuffer circDelayBuffer;
+
 void hapt_Update(void);
 
 /**
@@ -52,6 +60,14 @@ void hapt_Init(void)
 	exuart_Init(576000);
     hapt_timestamp = 0;
     hapt_motorTorque = 0.0f;
+
+    //Initialize delay buffer
+    cb_Init(&circDelayBuffer, delayBuffer, QUEUE_SIZE);
+
+    //Fill buffer with zeros initially
+    for (uint16_t lv = 0; lv<QUEUE_SIZE-1; lv++){
+    	cb_Push(&circDelayBuffer, 0);
+    }
 
     // Make the timers call the update function periodically.
     cbt_SetHapticControllerTimer(hapt_Update, DEFAULT_HAPTIC_CONTROLLER_PERIOD);
@@ -67,6 +83,7 @@ void hapt_Init(void)
     comm_monitorFloat("slave torque [N.m]", (float32_t*)&gui_variable, READONLY);
     comm_monitorBool("enable master torque", (bool*)&enable_master, READWRITE);
     comm_monitorBool("enable DIO", (bool*) &digital_IO, READWRITE);
+    comm_monitorUint16("delay [samples]", (uint16_t*) &delay_samples, READWRITE);
 }
 
 /**
@@ -82,6 +99,34 @@ void hapt_Update()
 
 	//Set/reset GPIO
 	dio_Set(0, digital_IO);
+
+	if (cb_ItemsCount(&circDelayBuffer) > 4*delay_samples)
+		{
+		    //Discharge buffer
+		    while (cb_ItemsCount(&circDelayBuffer) > 4*delay_samples)
+		    {
+		    	cb_Pull(&circDelayBuffer);
+		    	cb_Pull(&circDelayBuffer);
+		    	cb_Pull(&circDelayBuffer);
+		    	cb_Pull(&circDelayBuffer);
+		    }
+		}
+		else if (cb_ItemsCount(&circDelayBuffer) < 4*delay_samples)
+		{
+			//Charge buffer
+			uint8_t bytes[4];
+			bytes[0] = temp_int32 && 0xFF;
+			bytes[1] = temp_int32>>8 && 0xFF;
+			bytes[2] = temp_int32>>16 && 0xFF;
+			bytes[3] = temp_int32>>24 && 0xFF;;
+		    while (cb_ItemsCount(&circDelayBuffer) < 4*delay_samples)
+		    {
+		    	cb_Push(&circDelayBuffer, bytes[0]);
+		    	cb_Push(&circDelayBuffer, bytes[1]);
+		    	cb_Push(&circDelayBuffer, bytes[2]);
+		    	cb_Push(&circDelayBuffer, bytes[3]);
+		    }
+		}
 
     float32_t motorShaftAngle; // [deg].
 
@@ -111,6 +156,42 @@ void hapt_Update()
     	exuart_SendByteAsync(*(byte_pointer)++); //sending
     }
 
+
+#if DELAY
+    // discard bytes until we have 9 bytes
+    while(exuart_ReceivedBytesCount() >= 9){
+    	exuart_GetByte();
+    }
+
+    // reading torque values from slave
+    if(exuart_ReceivedBytesCount() >= 5){
+    	//should keep reading the bytes until you see header
+    	while(exuart_ReceivedBytesCount() >= 5){ //if any bits received
+    		slave_bits = exuart_GetByte();
+    		if(slave_bits == START_BYTE){ //check the header byte
+    			slave_bits = exuart_GetByte();
+    			temp_int32 = slave_bits;
+
+    			slave_bits = exuart_GetByte();
+    			temp_int32 |= slave_bits << 8;
+
+    			slave_bits = exuart_GetByte();
+    			temp_int32 |= slave_bits << 16;
+
+    			slave_bits = exuart_GetByte();
+    			temp_int32 |= slave_bits << 24;
+
+    			temp_point = &temp_int32;
+    			temp_float32 = *(float32_t *) temp_point;
+    			bytes_read = temp_int32;
+
+    			gui_variable = temp_float32;
+    			break;
+    		}
+    	}
+    }
+
+#else
     // discard bytes until we have 9 bytes
     while(exuart_ReceivedBytesCount() >= 9){
     	exuart_GetByte();
@@ -143,6 +224,7 @@ void hapt_Update()
 			}
 	   }
 	}
+#endif
 
 	if(enable_master){
 		hapt_motorTorque = -temp_float32;

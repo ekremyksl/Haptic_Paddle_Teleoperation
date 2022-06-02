@@ -26,12 +26,12 @@
 
 #define DEFAULT_HAPTIC_CONTROLLER_PERIOD 350 // Default control loop period [us].
 #define START_BYTE 0x4D //header of bits sent
-#define CUT_OFF 50.0
+#define CUT_OFF 1000.0
 
-#define DELAY false
+#define DELAY true
 #define QUEUE_SIZE 1000*4+1 //1000 samples: Echo effect, very noticeable delay. Stiffness feels increased. Feeling an obstacle through teleoperation also is delayed.  //Number of samples of delay
 
-#define VIRTUAL_WALL true
+#define VIRTUAL_WALL false
 #define WALL_ANGLE 15.0 //PLace walls at +/- 30degrees
 
 volatile uint32_t  hapt_timestamp; // Time base of the controller, also used to timestamp the samples sent by streaming [us].
@@ -105,6 +105,7 @@ void hapt_Init(void)
     //------------------------------------------
     comm_monitorBool("enable PID", (bool*)&pid_enable, READWRITE);
     comm_monitorBool("enable DIO", (bool*) &digital_IO, READONLY);
+    comm_monitorUint16("delay [samples]", (uint16_t*) &delay_samples, READWRITE);
 }
 
 /**
@@ -232,11 +233,10 @@ void hapt_Update()
 				temp_point = &temp_int32;
 				temp_float32 = *(float32_t *) temp_point;
 				bytes_read = temp_int32;
-				if(temp_float32 < 45 && temp_float32 > -45){
+				if(temp_float32 < 45.0 && temp_float32 > -45.0){
 					gui_variable = temp_float32;
 				}
 
-				gui_variable = temp_float32;
 				break;
 			}
 	   }
