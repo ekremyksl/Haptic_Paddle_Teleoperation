@@ -25,7 +25,7 @@
 #include "drivers/ext_uart.h"
 #include "drivers/debug_gpio.h"
 
-#define SYNC_SENDER true
+#define SYNC_SENDER false
 
 #define DEFAULT_HAPTIC_CONTROLLER_PERIOD 350 // Default control loop period [us].
 #define START_BYTE 0x4D   //starting byte for synchronization
@@ -147,12 +147,12 @@ void hapt_Update()
 	}
 	else if (cb_ItemsCount(&circDelayBuffer) < 4*delay_samples)
 	{
-		//Charge buffer
 		uint8_t bytes[4];
-		bytes[0] = cb_Pull(&circDelayBuffer);
-		bytes[1] = cb_Pull(&circDelayBuffer);
-		bytes[2] = cb_Pull(&circDelayBuffer);
-		bytes[3] = cb_Pull(&circDelayBuffer);
+		bytes[0] = temp_int32 && 0xFF;
+		bytes[1] = temp_int32>>8 && 0xFF;
+		bytes[2] = temp_int32>>16 && 0xFF;
+		bytes[3] = temp_int32>>24 && 0xFF;;
+
 	    while (cb_ItemsCount(&circDelayBuffer) < 4*delay_samples)
 	    {
 	    	cb_Push(&circDelayBuffer, bytes[0]);
