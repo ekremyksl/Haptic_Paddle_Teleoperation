@@ -55,7 +55,7 @@ volatile float32_t speed = 0.0;
 volatile bool pid_enable = false;	// regulator flag to be turned on/off from GUI
 volatile bool digital_IO = false;
 
-volatile uint16_t delay_samples = 1;
+volatile uint16_t delay_samples = 0;
 
 volatile float32_t gui_variable = 45.0f;
 
@@ -137,10 +137,10 @@ void hapt_Update()
 	{
 		//Charge buffer
 		uint8_t bytes[4];
-		bytes[0] = cb_Pull(&circDelayBuffer);
-		bytes[1] = cb_Pull(&circDelayBuffer);
-		bytes[2] = cb_Pull(&circDelayBuffer);
-		bytes[3] = cb_Pull(&circDelayBuffer);
+		bytes[0] = temp_int32 && 0xFF;
+		bytes[1] = temp_int32>>8 && 0xFF;
+		bytes[2] = temp_int32>>16 && 0xFF;
+		bytes[3] = temp_int32>>24 && 0xFF;;
 	    while (cb_ItemsCount(&circDelayBuffer) < 4*delay_samples)
 	    {
 	    	cb_Push(&circDelayBuffer, bytes[0]);
@@ -177,6 +177,12 @@ void hapt_Update()
 	   while(exuart_ReceivedBytesCount() >= 5){ //if any bits received
 			slave_bits = exuart_GetByte();
 			if(slave_bits == START_BYTE){ //check the header byte
+			    //Implement delay
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+			    cb_Push(&circDelayBuffer, exuart_GetByte());
+
 				slave_bits = cb_Pull(&circDelayBuffer);
 				temp_int32 = slave_bits;
 
@@ -195,12 +201,6 @@ void hapt_Update()
 				if(temp_float32 < 45 && temp_float32 > -45){
 					gui_variable = temp_float32;
 				}
-
-			    //Implement delay
-			    cb_Push(&circDelayBuffer, exuart_GetByte());
-			    cb_Push(&circDelayBuffer, exuart_GetByte());
-			    cb_Push(&circDelayBuffer, exuart_GetByte());
-			    cb_Push(&circDelayBuffer, exuart_GetByte());
 				break;
 			}
 	   }
